@@ -311,7 +311,7 @@ class Tweet:
             max_init_words_to_find = 2
 
             raw_text = sub(
-                r'^[ \n\:\,\'\"\(\)\[\]\{\}\;\?\!\=]([\w].*$)',
+                r'^[ \n\:\,\'\"\(\)\[\]\{\}\;\?\!\=]*([a-zA-Z].*$)',
                 r'\1',
                 sub(r'\n|\\n', ' ', text)
             )

@@ -3,7 +3,7 @@ from .db_handler import Database
 from time import sleep
 
 
-def main():
+def run():
     # Initialize Database
     db = Database('sqlite', dbname='data/bot.db')
     db.create_db_tables()
