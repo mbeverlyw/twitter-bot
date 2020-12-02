@@ -3,8 +3,12 @@ from re import match, findall, sub
 
 
 class Scraper:
-    def __init__(self, username, db):
+    def __init__(self, config, db):
         self.db = db
+        self.username = username = config.get(
+            'Credentials', 'username'
+            )
+        password = config.get('Credentials', 'password')
 
         useragent = 'Mozilla/5.0 (X11; U; Linux i686; en-US) ' \
                     'AppleWebKit/534.3 (KHTML, like Gecko) ' \
@@ -32,9 +36,7 @@ class Scraper:
             'mentions': "/notifications/mentions"
         }
 
-
-        self.username = username
-
+        self.login(password)
 
 
     def login(self, password):
