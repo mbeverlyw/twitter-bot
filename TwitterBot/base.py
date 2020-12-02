@@ -4,6 +4,7 @@ from re import match, findall, sub
 
 class Scraper:
     def __init__(self, config, db):
+        self.config = config
         self.db = db
         self.username = username = config.get(
             'Credentials', 'username'
@@ -92,7 +93,7 @@ class Scraper:
         notifications_data = __parse_html_for_mentions(mentions_page_data)
 
         for notification in notifications_data:
-            tweet = Tweet(notification, self.db)
+            tweet = Tweet(notification, self.db, self.config)
 
             if tweet.contains_mention:
                 mentions.append(tweet)
@@ -203,7 +204,10 @@ class Tweet:
     retweet_url = None
     reply_url = None
 
-    def __init__(self, data, db):
+    def __init__(self, data, db, config):
+
+        self.config = config
+
         raw_header = self.__parse_for_header(data)
         self.db = db
         self.id = self.__parse_for_id(raw_header)
