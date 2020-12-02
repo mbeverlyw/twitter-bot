@@ -1,9 +1,11 @@
 import mechanicalsoup
 from re import match, findall, sub
-
+from log_handler import logger
 
 class Scraper:
     def __init__(self, config, db):
+        self.log = logger(__name__)
+    
         self.config = config
         self.db = db
         self.username = username = config.get(
@@ -37,45 +39,61 @@ class Scraper:
             'mentions': "/notifications/mentions"
         }
 
+        self.log.info('Attempting login...')
         self.login(password)
+
 
 
     def login(self, password):
         """
         Open Login Page, Select login/sessions form, insert creds, and submit login.
         """
+        self.log.info('Opening login page & selecting form')
         self.browser.open(self.ext_urls['login'], headers=self.header)
         self.browser.select_form(f'form[action="{self.ext_urls["session"]}"]')
-
-        # Print input form
-        self.browser.get_current_form().print_summary()
+        
 
         # Insert User & Pass, then Submit
+        self.log.info('Inserting credentials into selected form.')
         self.browser["session[username_or_email]"] = self.username
         self.browser["session[password]"] = password
         response = self.browser.submit_selected()
 
         try:
+            self.log.info(f'Attempting to access {self.username}\'s Profile')
+            
             self.goto_profile()
             self.db.insert_login_activity(self.username, True)
-        except mechanicalsoup.utils.LinkNotFoundError:
+
+            self.log.info('Profile successfully accessed.')
+
+        except mechanicalsoup.utils.LinkNotFoundError as e:
             self.db.insert_login_activity(self.username, False)
+
+            self.log.error('Profile was NOT able to be accessed. Login Failed..')
+            self.log.error(e)
+
 
     def goto_profile(self):
         """
         Access the User's profile.
         """
+        self.log.info('Accessing user\'s profile')
+
         self.browser.open(self.base_url + self.ext_urls['profile'], headers=self.header)
         self.browser.follow_link(self.ext_urls['profile'])
-        self.print_current_loc()
+
+        # self.print_current_loc()
 
     def goto_mentions(self, process_mentions=False):
         """
         Access the User's profile.
         """
-        #self.browser.open(self.base_url + self.ext_urls['notifications'], headers=self.header)
+        self.log.info('Accessing user\'s notifications')
+        self.log.debug(f'Process notifications={process_mentions}')
+
         self.browser.follow_link('/i/connect')
-        self.print_current_loc()
+        # self.print_current_loc()
 
         process_mentions and self.identify_mentions()
 
@@ -86,6 +104,8 @@ class Scraper:
         def __parse_html_for_mentions(__page_data):
             regex = r"\<table class=\"tweet\"(.*?)\<\/table"
             return findall(regex, repr(__page_data))
+        
+        self.log.info('Processing Mentions')
 
         mentions = []
 
@@ -96,10 +116,12 @@ class Scraper:
             tweet = Tweet(notification, self.db, self.config)
 
             if tweet.contains_mention:
-                mentions.append(tweet)
-
                 if tweet.is_new:
+                    self.log.info(f'NEW Mention Found! Tweet ID:{tweet.id}')
                     self.db.insert_notification(tweet)
+                
+                self.log.info(f'Tweet ({tweet.id}) is mention, adding to list.')
+                mentions.append(tweet)
 
         for mention in mentions:
             self.process_mention(mention)
@@ -113,7 +135,8 @@ class Scraper:
         :param tweet:
         :return:
         """
-
+        self.log.info(f'Processing Tweet({tweet.id})\'s command request.')
+        
         command_response = {
             'invalid': [
                 self.reply_to_mention,
@@ -140,43 +163,50 @@ class Scraper:
             tweet,
             command_response[tweet.command_found][1]
         )
+
         self.db.update_notification_is_done(tweet.id)
+        self.log.info(f'({tweet.command_found}) Response Completed for Tweet({tweet.id})')
 
     def reply_to_mention(self, tweet, response):
         form_identifier = 'form[action="/compose/tweet"]'
 
-        print(f"Attempting to reply to {tweet}")
-        print(f"Following Link: {tweet.reply_url}")
+        self.log.info(f"Attempting to reply to {tweet}")
+        self.log.info(f"Following Link: {tweet.reply_url}")
 
         self.browser.follow_link(tweet.reply_url)
-        self.print_current_loc()
-        #self.print_current_page()
+        # self.print_current_loc()
 
         self.browser.select_form(form_identifier)
         self.browser.get_current_form().print_summary()
         self.browser["tweet[text]"] = response
         response = self.browser.submit_selected()
-        print(f"Response from form submit: {response}")
+        self.log.info(f"Response from form submit: {response}")
+
+        self.log.info("Returning to Notifications")
         self.goto_mentions()
 
 
     def retweet_mention(self, tweet, *args):
         form_identifier = f'form[action="/statuses/{tweet.id}/retweet"]'
 
-        print(f"Attempting to reply to {tweet}")
-        print(f"Following Link: {tweet.retweet_url}")
+        self.log.info(f"Attempting to reply to {tweet}")
+        self.log.info(f"Following Link: {tweet.retweet_url}")
 
         self.browser.follow_link(tweet.retweet_url)
-        self.print_current_loc()
-        #self.print_current_page()
+        # self.print_current_loc()
+        # self.print_current_page()
 
         try:
             self.browser.select_form(form_identifier)
             self.browser.get_current_form().print_summary()
             response = self.browser.submit_selected()
-            print(f"Response from form submit: {response}")
+            self.log.info(f"Response from form submit: {response}")
+        
         except mechanicalsoup.utils.LinkNotFoundError:
-            print(f"{tweet.id} from {tweet.sender} has already been retweeted.")
+            self.log.warning(
+                f"{tweet.id} from {tweet.sender} has already been retweeted.")
+        
+        self.log.info("Returning to Notifications")
         self.goto_mentions()
 
     def print_current_loc(self):
@@ -205,6 +235,8 @@ class Tweet:
     reply_url = None
 
     def __init__(self, data, db, config):
+
+        self.log = logger(__name__)
 
         self.config = config
 
@@ -242,16 +274,25 @@ class Tweet:
     @classmethod
     def __parse_for_header(cls, data):
         regex = [r"href=\"(.*?)\?p\=v\""]
+
+        self.log.debug("Parsing tweet for header")
+
         return cls.__parse_data(regex, data)
 
     @classmethod
     def __parse_for_id(cls, header_data):
         header_segments = header_data.split('/')
+
+        self.log.debug("Parsing tweet for id")
+
         return header_segments[3]
 
     @classmethod
     def __parse_for_sender(cls, header_data):
         header_segments = header_data.split('/')
+
+        self.log.debug("Parsing tweet for sender")
+
         return header_segments[1]
 
     @classmethod
@@ -260,6 +301,9 @@ class Tweet:
             r'\<td class=\"timestamp\"\>(.*?)\<\/td\>',
             r'\>(.*?)\<\/a\>',
         ]
+
+        self.log.debug("Parsing tweet for timestamp")
+
         return cls.__parse_data(regex, data)
 
     @classmethod
@@ -269,28 +313,28 @@ class Tweet:
         raw_extras = []
         extras = None
         contains_mention = False
-
         regex_raw_text = [
             r'\<div class=\"tweet\-text\"(.*a class=\"twitter\-atreply dir\-ltr\".*\<\/div\>.*?)\<\/div\>',
             r'\<\/a\>(.*?)\<\/div\>'
         ]
         regex_text = r'\<a class=\"twitter.*'
-
         regex_raw_extras = [
             r'\<a class=\"twitter.?(.*?)\<\/a\>'
         ]
 
+        self.log.debug("Parsing tweet for text")
+
         try:
             raw_text = cls.__parse_data(regex_raw_text, data)
             contains_mention = True
-            print(raw_text)
+            # print(raw_text)
         except IndexError:
             return text, extras, contains_mention
 
         text = cls.__slice_data(regex_text, raw_text)
 
         raw_extras = cls.__parse_data(regex_raw_extras, raw_text, return_list=True)
-        len(raw_extras) > 0 and [print(e + '\n') for e in raw_extras]
+        # len(raw_extras) > 0 and [print(e + '\n') for e in raw_extras]
 
         return text, extras, contains_mention
 
@@ -321,8 +365,8 @@ class Tweet:
                 r'\1',
                 sub(r'\n|\\n', ' ', text)
             )
-            print(f"ORI Text: {text}")
-            print(f"RAW Text:{raw_text}")
+            # print(f"ORI Text: {text}")
+            # print(f"RAW Text:{raw_text}")
 
             command_text = raw_text.lower().split(' ')[
                            0:max_init_words_to_find
@@ -334,13 +378,13 @@ class Tweet:
 
         def _determine_command():
             command_text = _find_text_in_cmd_pos()
-            print(f"Initial Words Found: {command_text}")
+            # print(f"Initial Words Found: {command_text}")
 
             for cmd_id, command in enumerate(available_commands):
 
                 if match(command + r'.*', command_text):
                     return cmd_id
-                print(f"txt({command_text})!=({command})")
+                # print(f"txt({command_text})!=({command})")
             else:
                 return 0
 
@@ -353,10 +397,10 @@ class Tweet:
         try:
             command_found = available_commands[_determine_command()]
         except TypeError:
-            print(f"!!!!! ERROR {text}")
+            # print(f"!!!!! ERROR {text}")
             command_found = available_commands[0]
 
-        print(f"COMMAND FOUND: {command_found}")
+        # print(f"COMMAND FOUND: {command_found}")
 
         return command_found
 

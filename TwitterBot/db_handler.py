@@ -25,9 +25,10 @@ class Database:
         if dbtype in self.DB_ENGINE.keys():
             engine_url = self.DB_ENGINE[dbtype].format(DB=dbname)
             self.db_engine = create_engine(engine_url)
-            print(self.db_engine)
+            # print(self.db_engine)
         else:
-            print("DBType is not found in DB_ENGINE")
+            # print("DBType is not found in DB_ENGINE")
+            pass
 
     @staticmethod
     def __get_timestamp():
@@ -57,40 +58,43 @@ class Database:
                               )
         try:
             metadata.create_all(self.db_engine)
-            print("Tables created")
+            # print("Tables created")
         except Exception as e:
-            print("Error occurred during Table creation!")
-            print(e)
+            # print("Error occurred during Table creation!")
+            # print(e)
+            pass
 
     def execute_query(self, query=None):
         if query is None: return
-        print(query)
+        # print(query)
 
         with self.db_engine.connect() as connection:
             try:
                 connection.execute(query)
             except Exception as e:
-                print(e)
+                # print(e)
+                pass
 
     def print_all_data(self, table=None, query=None, get_results=False):
         query = query \
             if query is not None \
             else f"SELECT * FROM '{table}';"
-        print(query)
+        # print(query)
 
         with self.db_engine.connect() as connection:
             try:
                 result = connection.execute(query)
             except Exception as e:
-                print(e)
+                # print(e)
+                pass
             else:
                 rows = []
                 for row in result:
-                    print(row)
+                    # print(row)
                     rows.append(row)
 
                 result.close()
-                print("\n")
+                # print("\n")
 
                 if get_results: return rows
 
@@ -108,8 +112,8 @@ class Database:
                 f"WHERE tweet_id='{tweet_id}';"
         results = self.print_all_data(query=query, get_results=True)
         results_count = len(results)
-        print(results)
-        print(f"Results found: {results_count}")
+        # print(results)
+        # print(f"Results found: {results_count}")
 
         if results_count > 0:
             is_queued = False \
@@ -122,7 +126,7 @@ class Database:
 
     def insert_notification(self, tweet):
         response_status = "DONE" if not tweet.is_queued else "Queued"
-        print(f"Inserting new Tweet")
+        # print(f"Inserting new Tweet")
         query = f"INSERT INTO {NOTIFICATIONS} " \
                 f"(id, tweet_id, sender, text, request_type, " \
                 f"response_status, timestamp) " \
@@ -138,4 +142,4 @@ class Database:
                 f"set response_status='DONE' " \
                 f"WHERE tweet_id='{tweet_id}';"
         self.execute_query(query)
-        print(self.print_all_data(NOTIFICATIONS))
+        # print(self.print_all_data(NOTIFICATIONS))
