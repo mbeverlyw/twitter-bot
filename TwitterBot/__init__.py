@@ -20,7 +20,10 @@ def run():
     # Initialize Database
     log.info('Initializing DB')
 
-    db = Database('sqlite', dbname='data/bot.db')
+    db = Database(
+        config.get('Database', 'type'), 
+        dbname=config.get('Database', 'uri')
+        )
     db.create_db_tables()
 
     log.info('DB Set')
