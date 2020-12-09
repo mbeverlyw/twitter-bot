@@ -6,52 +6,28 @@ from .log_handler import logger
 
 CONFIG_PATH = "data/config.ini"
 
-def run():
+def initialize():
     # Setup Logger
     log = logger(__name__)
 
     # Initialize Config
-    log.info('Initializing Configuration')
-
     config = __init_config()
 
-    log.info('Configuration Set')
-
     # Initialize Database
-    log.info('Initializing DB')
+    db_type = config.get('Database', 'type')
+    db_uri = config.get('Database', 'uri')
 
-    db = Database(
-        config.get('Database', 'type'), 
-        dbname=config.get('Database', 'uri')
-        )
-    db.create_db_tables()
+    db = Database(db_type, dbname=db_uri)
 
-    log.info('DB Set')
 
     # Initialize Scraper 
-    log.info('Initializing Scraper')
-    scraper = Scraper(config, db)
-    log.info('Scraper Set')
+    scraper = Scraper(config, db)    
 
-    '''
-    Continuously go to Twitter notifications and process
-        notifications directed to bot appropriately.
-    '''
-    log.info('Proceeding to bot actions..')
-
-    while 1:
-        scraper.goto_mentions(process_mentions=True)
-        sleep(12)
+    return scraper
     
 
 def __init_config():
     config = configparser.ConfigParser()
     config.read(CONFIG_PATH)
-
+    
     return config
-
-
-
-if __name__ == "__main__":
-    main()
-

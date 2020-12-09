@@ -129,3 +129,4 @@ dmypy.json
 .pyre/
 Todo
 data/bot.db
+bot.sqlite

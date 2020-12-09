@@ -22,3 +22,7 @@ def logger(name):
     logger.addHandler(handler)
 
     return logger
+
+
+def get_logger(name):
+    return logging.getLogger(name)

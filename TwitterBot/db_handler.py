@@ -29,6 +29,8 @@ class Database:
         else:
             # print("DBType is not found in DB_ENGINE")
             pass
+        
+        self.create_db_tables()
 
     @staticmethod
     def __get_timestamp():
